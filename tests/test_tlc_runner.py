@@ -88,5 +88,35 @@ class TlcClassificationTests(unittest.TestCase):
         self.assertFalse(RUNNER.classify("mutant", 12, text)[0])
 
 
+    def test_previous_database_cannot_supply_current_database_evidence(self):
+        for current in ('[status |-> "committed", canonical |-> {a}]',
+                        '[status |-> "open", canonical |-> {a}]',
+                        '[status |-> "committed", canonical |-> {}]'):
+            for previous_first in (True, False):
+                old = '/\\ previousDB = [status |-> "open", canonical |-> {}]\n'
+                db = '/\\ db = ' + current + '\n'
+                prefix = MUTANT_TRACE.rsplit('/\\ db = ', 1)[0]
+                text = prefix + (old + db if previous_first else db + old)
+                with self.subTest(current=current, previous_first=previous_first):
+                    self.assertFalse(RUNNER.classify("mutant", 12, text)[0])
+
+    def test_nested_database_fields_cannot_supply_evidence(self):
+        text = MUTANT_TRACE.rsplit('/\\ db = ', 1)[0]
+        text += '/\\ db = [status |-> "committed", canonical |-> {a}, prior |-> [status |-> "open", canonical |-> {}]]\n'
+        self.assertFalse(RUNNER.classify("mutant", 12, text)[0])
+
+    def test_multiline_database_and_previous_database_are_supported(self):
+        text = MUTANT_TRACE.rsplit('/\\ db = ', 1)[0]
+        text += '/\\ previousDB = [status |-> "absent", canonical |-> {}]\n'
+        text += '/\\ db = [staged |-> {a},\n         canonical |-> {},\n         status |-> "open"]\n'
+        self.assertTrue(RUNNER.classify("mutant", 12, text)[0])
+
+    def test_duplicate_current_state_variables_reject(self):
+        for extra in ('/\\ db = [status |-> "open", canonical |-> {}]\n',
+                      '/\\ ackReceived = TRUE\n',
+                      '/\\ lastAction = "AckBeforeCommit"\n'):
+            self.assertFalse(RUNNER.classify("mutant", 12, MUTANT_TRACE + extra)[0])
+
+
 if __name__ == "__main__":
     unittest.main()
