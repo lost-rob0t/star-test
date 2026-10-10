@@ -10,7 +10,10 @@ main :-
 run :-
     read_string(current_input,65537,Raw), string_length(Raw,Size),
     ( Size =< 65536 -> true ; throw(error(resource_error(input_bytes),_)) ),
-    atom_string(Encoded,Raw), atom_json_dict(Encoded,Input,[value_string_as(atom)]),
+    setup_call_cleanup(open_string(Raw,Stream),
+        ( json_read_dict(Stream,Input,[value_string_as(atom)]),
+          read_string(Stream,_,Tail), normalize_space(string(""),Tail) ),
+        close(Stream)),
     dict_pairs(Input,_,Pairs), pairs_keys(Pairs,Keys), sort(Keys,[complete,events]),
     maplist(event,Input.events,Actions),
     check_trace(Actions,Input.complete,Report),

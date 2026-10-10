@@ -55,6 +55,7 @@ jobs:
         run: |
           mkdir -p evidence
           git rev-parse HEAD | tee evidence/head.txt
+          python3 -m unittest discover -s tests -p 'test_tlc_runner.py' -v
           bash scripts/check-tlc.sh --output evidence/tlc
       - name: Preserve model evidence
         if: always()
