@@ -29,6 +29,68 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def split_record_fields(value):
+    """Split a TLC record at its own commas, never those in nested values."""
+    value = value.strip()
+    if not (value.startswith("[") and value.endswith("]")):
+        raise ValueError("expected a record")
+    fields, start, stack = [], 1, []
+    quoted = escaped = False
+    closing = {"]": "[", "}": "{", ")": "("}
+    for index, char in enumerate(value[1:-1], 1):
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+            continue
+        if char == '"':
+            quoted = True
+        elif char in "[{(":
+            stack.append(char)
+        elif char in "]})":
+            if not stack or stack.pop() != closing[char]:
+                raise ValueError("unbalanced record")
+        elif char == "," and not stack:
+            fields.append(value[start:index])
+            start = index + 1
+    if stack or quoted:
+        raise ValueError("unfinished record")
+    fields.append(value[start:-1])
+    result = {}
+    for field in fields:
+        match = re.fullmatch(r"\s*([A-Za-z_][A-Za-z_0-9]*)\s*\|->\s*(.*?)\s*",
+                             field, re.DOTALL)
+        if not match or match[1] in result:
+            raise ValueError("invalid or duplicate record field")
+        result[match[1]] = match[2]
+    return result
+
+
+def mutant_state_matches(last_state):
+    """Read exact TLC state assignments and the actual db's direct fields."""
+    assignments = list(re.finditer(
+        r"(?m)^/\\\s+([A-Za-z_][A-Za-z_0-9]*)\s*=\s*", last_state))
+    values = {}
+    for index, match in enumerate(assignments):
+        if match[1] in values:
+            return False
+        end = assignments[index + 1].start() if index + 1 < len(assignments) else len(last_state)
+        # TLC wraps values on indented lines; trailing statistics are not state.
+        raw = last_state[match.end():end]
+        values[match[1]] = re.split(r"\n(?=\S)", raw, maxsplit=1)[0].strip()
+    if values.get("lastAction") != '"AckBeforeCommit"' or values.get("ackReceived") != "TRUE":
+        return False
+    try:
+        fields = split_record_fields(values.get("db", ""))
+    except ValueError:
+        return False
+    return fields.get("status") == '"open"' and re.fullmatch(
+        r"\{\s*\}", fields.get("canonical", "")) is not None
+
+
 def classify(kind, returncode, text):
     """A parser crash, deadlock, timeout, or different violation never passes."""
     names = re.findall(r"Invariant ([A-Za-z_][A-Za-z_0-9]*) is violated\.", text)
@@ -41,10 +103,7 @@ def classify(kind, returncode, text):
         returncode == 12  # Official v1.7.4 EC.ExitStatus.VIOLATION_SAFETY.
         and names == ["AckDurable"]
         and TRACE_HEADER in text
-        and 'lastAction = "AckBeforeCommit"' in last_state
-        and "ackReceived = TRUE" in last_state
-        and re.search(r'status\s*\|->\s*"open"', last_state) is not None
-        and re.search(r"canonical\s*\|->\s*\{\s*\}", last_state) is not None
+        and mutant_state_matches(last_state)
     )
     return expected, "expected-mutant-counterexample" if expected else "unexpected-checker-outcome"
 
