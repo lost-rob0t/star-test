@@ -1,0 +1,45 @@
+name: Bounded staged-import validation
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  oracle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install SWI from Ubuntu
+        run: sudo apt-get update && sudo apt-get install -y swi-prolog-nox
+      - name: Record exact evidence identities
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD | tee evidence/head.txt
+          swipl --version | tee evidence/swi-version.txt
+          sha256sum "$(readlink -f "$(command -v swipl)")" > evidence/swi-sha256.txt
+          find oracle tests traces -type f -print0 | sort -z | xargs -0 sha256sum > evidence/input-sha256.txt
+      - name: Oracle unit and CLI tests
+        run: |
+          set -o pipefail
+          swipl -q -f none --no-packs -s tests/oracle_tests.pl 2>&1 | tee evidence/oracle-tests.log
+          python3 -m unittest discover -s tests -p '*_tests.py' -v 2>&1 | tee evidence/cli-tests.log
+          swipl -q -f none --no-packs -s oracle/cli.pl < traces/ack-restart.json > evidence/trace-pass.json
+          set +e
+          swipl -q -f none --no-packs -s oracle/cli.pl < traces/ack-before-commit.json > evidence/trace-mutant.json
+          status=$?
+          set -e
+          test "$status" -eq 1
+          python3 -c 'import json; r=json.load(open("evidence/trace-mutant.json")); assert r["verdict"]=="fail" and r["first_failure"]==3'
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: oracle-evidence
+          path: evidence
+          if-no-files-found: error
