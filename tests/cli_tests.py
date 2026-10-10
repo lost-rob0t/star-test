@@ -34,6 +34,18 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertEqual(json.loads(result.stdout)["verdict"], "error")
 
+    def test_json_string_booleans_rejected(self):
+        pristine = json.loads((ROOT / "traces/ack-restart.json").read_text())
+        for field in ("complete", "receipt", "active"):
+            for literal in ("true", "false"):
+                value = json.loads(json.dumps(pristine))
+                target = value if field == "complete" else value["events"][-1]
+                target[field] = literal
+                with self.subTest(field=field, literal=literal):
+                    result = run(value)
+                    self.assertEqual(result.returncode, 2, result.stdout)
+                    self.assertEqual(json.loads(result.stdout)["verdict"], "error")
+
     def test_oversized_input(self):
         result = run({"events": [], "complete": True, "padding": "x" * 65537})
         self.assertEqual(result.returncode, 2)

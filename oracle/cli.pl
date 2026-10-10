@@ -11,7 +11,7 @@ run :-
     read_string(current_input,65537,Raw), string_length(Raw,Size),
     ( Size =< 65536 -> true ; throw(error(resource_error(input_bytes),_)) ),
     setup_call_cleanup(open_string(Raw,Stream),
-        ( json_read_dict(Stream,Input,[value_string_as(atom)]),
+        ( json_read_dict(Stream,Input,[value_string_as(string)]),
           read_string(Stream,_,Tail), normalize_space(string(""),Tail) ),
         close(Stream)),
     dict_pairs(Input,_,Pairs), pairs_keys(Pairs,Keys), sort(Keys,[complete,events]),
@@ -21,13 +21,16 @@ run :-
     ( Report.verdict == fail -> halt(1) ; Report.verdict == inconclusive -> halt(3) ; halt(0) ).
 event(D,A) :-
     dict_pairs(D,_,Pairs), pairs_keys(Pairs,Keys),
-    event_keys(D.op,Expected), sort(Keys,Expected),
-    convert(D.op,D,A), !.
+    symbol(D.op,Op), event_keys(Op,Expected), sort(Keys,Expected),
+    convert(Op,D,A), !.
 event(D,_) :- throw(error(domain_error(trace_event,D),_)).
 event_keys(Op,[op]) :- memberchk(Op,[begin,commit,ack,replay_commit,abort,crash,restart,unknown_commit]).
 event_keys(Op,[id,op]) :- memberchk(Op,[chunk,replay_chunk]).
 event_keys(read,[active,count,docs,journal,op,phase,receipt,revision,staged]).
-convert(chunk,D,chunk(D.id)).
-convert(replay_chunk,D,replay_chunk(D.id)).
-convert(read,D,read(D.docs,D.revision,D.count,D.journal,D.receipt,D.phase,D.staged,D.active)).
+symbol(Value,Atom) :- string(Value), atom_string(Atom,Value).
+convert(chunk,D,chunk(Id)) :- symbol(D.id,Id).
+convert(replay_chunk,D,replay_chunk(Id)) :- symbol(D.id,Id).
+convert(read,D,read(Docs,D.revision,D.count,D.journal,D.receipt,Phase,Staged,D.active)) :-
+    is_list(D.docs), is_list(D.staged),
+    maplist(symbol,D.docs,Docs), maplist(symbol,D.staged,Staged), symbol(D.phase,Phase).
 convert(Op,_,Op) :- memberchk(Op,[begin,commit,ack,replay_commit,abort,crash,restart,unknown_commit]).
