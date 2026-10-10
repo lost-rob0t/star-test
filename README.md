@@ -15,6 +15,12 @@ synthetic oracle suite:
 The deliberate ack-before-commit trace must fail with exit 1 at event 3.
 The uncertain-commit tests preserve both possible durable outcomes until observed.
 
+The finite model and its deliberate mutant run with Java and Python 3:
+
+    bash scripts/check-tlc.sh
+
+See [model bounds and checker evidence](model/README.md).
+
 ## What this establishes
 
 The oracle checks finite serial abstract traces. TLC checks the explicitly bounded

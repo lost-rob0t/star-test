@@ -34,6 +34,18 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertEqual(json.loads(result.stdout)["verdict"], "error")
 
+    def test_oversized_input(self):
+        result = run({"events": [], "complete": True, "padding": "x" * 65537})
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(json.loads(result.stdout)["verdict"], "error")
+
+    def test_trailing_json_rejected(self):
+        result = subprocess.run(
+            ["swipl", "-q", "-f", "none", "--no-packs", "-s", "oracle/cli.pl"],
+            cwd=ROOT, input='{"events": [], "complete": true} {}', text=True,
+            capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 2, result.stdout)
+
     def test_incomplete(self):
         result = run({"events": [{"op": "begin"}], "complete": False})
         self.assertEqual(result.returncode, 3)

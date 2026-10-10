@@ -43,3 +43,28 @@ jobs:
           name: oracle-evidence
           path: evidence
           if-no-files-found: error
+  tlc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Record exact head and run finite model plus mutant
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD | tee evidence/head.txt
+          bash scripts/check-tlc.sh --output evidence/tlc
+      - name: Preserve model evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tlc-evidence
+          path: |
+            evidence/head.txt
+            evidence/tlc/manifest.json
+            evidence/tlc/normal/tlc.log
+            evidence/tlc/mutant/tlc.log
+            evidence/tlc/mutant/ack-before-commit-counterexample.txt
+          if-no-files-found: error
