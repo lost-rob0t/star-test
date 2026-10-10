@@ -1,0 +1,34 @@
+{
+  "complete": true,
+  "events": [
+    {
+      "op": "begin"
+    },
+    {
+      "op": "chunk",
+      "id": "a"
+    },
+    {
+      "op": "ack"
+    },
+    {
+      "op": "crash"
+    },
+    {
+      "op": "restart"
+    },
+    {
+      "op": "read",
+      "docs": [],
+      "revision": 0,
+      "count": 0,
+      "journal": 0,
+      "receipt": false,
+      "phase": "open",
+      "staged": [
+        "a"
+      ],
+      "active": true
+    }
+  ]
+}

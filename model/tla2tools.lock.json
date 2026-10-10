@@ -1,0 +1,11 @@
+{
+  "name": "tla2tools.jar",
+  "version": "1.7.4",
+  "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
+  "size_bytes": 2274532,
+  "digest_algorithm": "sha1",
+  "digest": "bee4a54f3ee3d4afc347c3240ec2d9e93b075104",
+  "digest_source": "https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4",
+  "asset_metadata_source": "https://api.github.com/repos/tlaplus/tlaplus/releases/assets/184694200",
+  "note": "Upstream publishes SHA-1, not SHA-256, for this asset. Verify that published digest and record the downloaded bytes' SHA-256 in each run. SHA-1 is a legacy integrity pin, not a strong modern supply-chain authentication claim."
+}
